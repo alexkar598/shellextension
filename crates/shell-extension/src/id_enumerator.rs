@@ -1,0 +1,5 @@
+#![implement()]
+pub struct EnumIdList {
+    
+}
+
