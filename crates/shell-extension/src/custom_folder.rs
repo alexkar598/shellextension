@@ -1,6 +1,5 @@
 use std::ffi::c_void;
 use std::ops::BitAnd;
-use std::ptr::null;
 use std::sync::atomic::Ordering;
 use std::sync::RwLock;
 use windows::Win32::Foundation::{E_NOTIMPL, HWND, LPARAM, S_FALSE};
