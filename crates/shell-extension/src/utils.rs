@@ -1,6 +1,7 @@
 pub mod hresult;
 pub mod outrefcast;
-mod itemidlist;
+pub mod itemidlist;
 
 pub use hresult::*;
 pub use outrefcast::*;
+pub use itemidlist::*;

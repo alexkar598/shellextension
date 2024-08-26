@@ -1,4 +1,5 @@
 #![feature(try_trait_v2)]
+#![feature(ptr_metadata)]
 
 mod class_factory;
 mod constants;
