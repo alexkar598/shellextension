@@ -6,8 +6,7 @@ use windows::Win32::Foundation::{E_NOTIMPL, HWND, LPARAM, S_FALSE};
 use windows::Win32::System::Com::{IBindCtx, IPersist_Impl};
 use windows::Win32::UI::Shell::Common::{ITEMIDLIST, SHCOLSTATE, SHELLDETAILS, STRRET};
 use windows::Win32::UI::Shell::{IEnumExtraSearch, IEnumIDList, IPersistFolder2, IPersistFolder2_Impl, IPersistFolder_Impl, IShellFolder2, IShellFolder2_Impl, IShellFolder_Impl, SHCONTF_NONFOLDERS, SHGDNF};
-use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_DEFBUTTON1};
-use windows_core::{implement, w, GUID, HRESULT, PCWSTR, VARIANT};
+use windows_core::{implement, GUID, HRESULT, PCWSTR, VARIANT};
 use crate::{DLL_REF_COUNT, TEST_GUID};
 
 #[implement(IPersistFolder2, IShellFolder2)]
@@ -42,9 +41,6 @@ impl IPersist_Impl for CustomFolder_Impl {
 }
 impl IPersistFolder_Impl for CustomFolder_Impl {
     fn Initialize(&self, pidl: *const ITEMIDLIST) -> windows_core::Result<()> {
-        unsafe {
-            MessageBoxW(HWND::default(), w!("We had printf debugging 50 years ago. Somehow, we can't even achieve that and we have to resort to using fucking message boxes because microsoft decided in all their wisdom that explorer.exe should restart itself every single time no matter what combinasion of arcane registry keys and command line arguments you pass in because microsoft hates you, hates me and hates everything sane and we can't have anything remotely nice like starting up a child process with a debugger attached."), w!("Debugging"), MB_DEFBUTTON1);
-        }
         *self.location.write().unwrap() = Some(unsafe {*pidl});
         Ok(())
     }
