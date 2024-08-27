@@ -36,7 +36,7 @@ impl Clone for EnumIdList<'_> {
 }
 
 impl IEnumIDList_Impl for EnumIdList_Impl<'_> {
-    fn Next(&self, celt: u32, flags: *mut *mut ITEMIDLIST, pceltfetched: *mut u32) -> HRESULT {
+    fn Next(&self, celt: u32, output: *mut *mut ITEMIDLIST, pceltfetched: *mut u32) -> HRESULT {
         let mut fetched = 0;
         for i in 0..celt as usize {
             if let Some(item) = self
@@ -44,7 +44,7 @@ impl IEnumIDList_Impl for EnumIdList_Impl<'_> {
                 .get(self.index.load(Ordering::Acquire) as usize + i)
             {
                 if let Ok(ptr) = item.to_com_ptr() {
-                    unsafe { flags.wrapping_add(i).write(ptr) };
+                    unsafe { output.wrapping_add(i).write(ptr) };
                     fetched += 1;
                     continue;
                 }
