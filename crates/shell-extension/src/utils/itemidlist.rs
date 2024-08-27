@@ -18,7 +18,7 @@ impl ItemIdList {
             for item_id in &self.0 {
                 let size = item_id.len();
                 let item_id = item_id.as_ptr();
-                next.cast::<u16>().write_unaligned(size as u16);
+                next.cast::<u16>().write_unaligned(size as u16 + 2);
                 next = next.wrapping_byte_add(2);
                 next.copy_from_nonoverlapping(item_id, size);
                 next = next.wrapping_byte_add(size);
