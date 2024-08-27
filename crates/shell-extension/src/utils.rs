@@ -15,3 +15,7 @@ use windows_core::HSTRING;
 pub fn debug_log(text: impl Into<HSTRING>) {
     unsafe { OutputDebugStringW(&text.into()) };
 }
+pub fn not_implemented<T>(message: &str, code: windows_core::HRESULT) -> windows::core::Result<T> {
+    debug_log(format!("Not implemented: {message}"));
+    Err(code.into())
+}

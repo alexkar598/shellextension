@@ -11,7 +11,7 @@ pub struct ItemIdList(pub Vec<Box<[u8]>>);
 impl ItemIdList {
     pub fn to_com_ptr(&self) -> windows::core::Result<*mut ITEMIDLIST> {
         let total_size = self.0.iter().map(|x| x.len() + 2).sum::<usize>() + 2;
-        let memory = alloc_com_ptr::<ITEMIDLIST>(total_size)?.as_mut_ptr();
+        let memory = alloc_com_ptr(total_size)?;
         let mut next = memory.cast::<u8>();
 
         unsafe {
@@ -25,7 +25,7 @@ impl ItemIdList {
             }
             next.cast::<u16>().write_unaligned(0u16);
         }
-        Ok(memory)
+        Ok(memory.cast())
     }
 }
 
