@@ -61,7 +61,10 @@ impl IEnumIDList_Impl for EnumIdList_Impl<'_> {
             }
         }
 
-        debug_log(format!("EnumIdList.Next/ret: fetched: {fetched}"));
+        debug_log(format!(
+            "EnumIdList.Next/ret: fetched:{fetched} hasmore:{}",
+            celt == fetched
+        ));
 
         match celt == fetched {
             true => S_OK,

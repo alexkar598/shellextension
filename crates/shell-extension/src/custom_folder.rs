@@ -78,12 +78,16 @@ impl IPersistFolder2_Impl for CustomFolder_Impl {
 }
 lazy_static! {
     static ref virtual_fs: Vec<ItemIdList> = vec![
-        vec!["Hi!".as_bytes().into()].into(),
-        vec!["Meow, ".as_bytes().into()].into(),
-        vec!["comment".as_bytes().into()].into(),
-        vec!["ça".as_bytes().into()].into(),
-        vec!["va".as_bytes().into()].into(),
-        vec!["?".as_bytes().into()].into(),
+        vec!["Hi!".as_bytes()].into(),
+        vec!["Meow, ".as_bytes()].into(),
+        vec!["comment".as_bytes()].into(),
+        vec![OsString::from("ça\0")
+            .encode_wide()
+            .collect::<Vec<_>>()
+            .as_slice()]
+        .into(),
+        vec!["va".as_bytes()].into(),
+        vec!["?".as_bytes()].into(),
     ];
 }
 impl IShellFolder_Impl for CustomFolder_Impl {

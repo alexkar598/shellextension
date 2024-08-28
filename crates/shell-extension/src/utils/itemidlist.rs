@@ -68,9 +68,23 @@ impl From<*const ITEMIDLIST> for ItemIdList {
         result
     }
 }
-impl From<Vec<Box<[u8]>>> for ItemIdList {
-    fn from(value: Vec<Box<[u8]>>) -> Self {
-        Self(value)
+impl From<Vec<&[u8]>> for ItemIdList {
+    fn from(mut value: Vec<&[u8]>) -> Self {
+        Self(value.iter_mut().map(|&mut x| Box::from(x)).collect())
+    }
+}
+impl From<Vec<&[u16]>> for ItemIdList {
+    fn from(mut value: Vec<&[u16]>) -> Self {
+        Self(
+            value
+                .iter_mut()
+                .map(|&mut x| {
+                    let len = 2 * x.len();
+                    let ptr = x.as_ptr().cast::<u8>();
+                    Box::from(unsafe { std::slice::from_raw_parts(ptr, len) })
+                })
+                .collect(),
+        )
     }
 }
 
