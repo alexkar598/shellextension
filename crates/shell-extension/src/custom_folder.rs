@@ -291,7 +291,7 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
         psd.fmt = LVCFMT_LEFT.0;
         if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
             let column = &column.0;
-            let (column, size) = column.to_com_ptr();
+            let (column, size) = column.to_com_ptr()?;
             psd.cxChar = column.len() as i32;
             let string = alloc_com_ptr((column.len() + 1) * size_of::<u16>())?.cast::<u16>();
             unsafe {
