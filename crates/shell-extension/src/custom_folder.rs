@@ -291,16 +291,11 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
         psd.fmt = LVCFMT_LEFT.0;
         if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
             let column = &column.0;
-            let (column, size) = column.to_com_ptr()?;
-            psd.cxChar = column.len() as i32;
-            let string = alloc_com_ptr((column.len() + 1) * size_of::<u16>())?.cast::<u16>();
-            unsafe {
-                string.copy_from_nonoverlapping(column.as_ptr(), column.len());
-                string.wrapping_add(column.len()).write(0);
-            };
-
-            psd.str.uType = STRRET_WSTR.0 as u32;
-            psd.str.Anonymous.pOleStr = PWSTR::from_raw(string);
+            let (column, size): (*mut u16, _) = column.to_com_ptr()?;
+            psd.cxChar = size as i32;
+            psd.str.uType = STRRET_OFFSET.0 as u32;
+            psd.str.Anonymous.uOffset = 2;
+            // psd.str.Anonymous.pOleStr = PWSTR::from_raw(column);
 
             Ok(())
         } else {

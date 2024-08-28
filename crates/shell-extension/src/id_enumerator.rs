@@ -1,4 +1,4 @@
-use crate::utils::{debug_log, ItemIdList};
+use crate::utils::{debug_log, ItemIdList, ToComPtr};
 use crate::DLL_REF_COUNT;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -47,7 +47,7 @@ impl IEnumIDList_Impl for EnumIdList_Impl<'_> {
         for i in 0..celt as usize {
             if let Some(item) = self.list.get(current_index + i) {
                 if let Ok(ptr) = item.to_com_ptr() {
-                    unsafe { output.wrapping_add(i).write(ptr) };
+                    unsafe { output.wrapping_add(i).write(ptr.0) };
                     fetched += 1;
                     continue;
                 }
