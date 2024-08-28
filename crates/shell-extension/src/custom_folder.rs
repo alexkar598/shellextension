@@ -1,5 +1,5 @@
 use crate::id_enumerator::EnumIdList;
-use crate::utils::{alloc_com_ptr, debug_log, not_implemented, ItemIdList};
+use crate::utils::{alloc_com_ptr, debug_log, not_implemented, ItemIdList, ToComPtr};
 use crate::{DLL_REF_COUNT, NAME_PROPERTY_GUID, TEST_GUID};
 use encoding_rs::mem::encode_latin1_lossy;
 use lazy_static::lazy_static;
@@ -74,7 +74,7 @@ impl IPersistFolder2_Impl for CustomFolder_Impl {
         debug_log(format!(
             "CustomFolder.GetCurFolder/ret: location:{location:?}"
         ));
-        location.to_com_ptr()
+        Ok(location.to_com_ptr()?.0)
     }
 }
 lazy_static! {
@@ -205,16 +205,16 @@ impl IShellFolder_Impl for CustomFolder_Impl {
 
     fn GetDisplayNameOf(
         &self,
-        _pidl: *const ITEMIDLIST,
+        pidl: *const ITEMIDLIST,
         _uflags: SHGDNF,
         pname: *mut STRRET,
     ) -> windows_core::Result<()> {
+        let pidl = ItemIdList::from(pidl);
         debug_log(format!(
-            "CustomFolder.GetDisplayNameOf: pidl:{:?} flags:{_uflags:?} pagename:{pname:?}",
-            ItemIdList::from(_pidl)
+            "CustomFolder.GetDisplayNameOf: pidl:{pidl:?} flags:{_uflags:?} pagename:{pname:?}",
         ));
         let pname = unsafe { pname.as_mut() }.ok_or(E_POINTER)?;
-        pname.uType = STRRET_OFFSET.0 as u32;
+        pname.uType = STRRET_WSTR.0 as u32;
         pname.Anonymous.uOffset = 2;
         Ok(())
     }
@@ -291,7 +291,7 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
         psd.fmt = LVCFMT_LEFT.0;
         if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
             let column = &column.0;
-            let column: Vec<_> = column.encode_wide().collect();
+            let (column, size) = column.to_com_ptr();
             psd.cxChar = column.len() as i32;
             let string = alloc_com_ptr((column.len() + 1) * size_of::<u16>())?.cast::<u16>();
             unsafe {

@@ -1,5 +1,5 @@
-use crate::utils::alloc::alloc_com_ptr;
 use crate::utils::item_id::ItemId;
+use crate::utils::{alloc_com_ptr, ToComPtr};
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::ptr;
@@ -8,8 +8,8 @@ use windows::Win32::UI::Shell::Common::ITEMIDLIST;
 #[repr(transparent)]
 #[derive(PartialEq, PartialOrd)]
 pub struct ItemIdList(pub Vec<Box<[u8]>>);
-impl ItemIdList {
-    pub fn to_com_ptr(&self) -> windows::core::Result<*mut ITEMIDLIST> {
+impl ToComPtr<ITEMIDLIST> for &ItemIdList {
+    fn to_com_ptr(self) -> windows::core::Result<(*mut ITEMIDLIST, usize)> {
         let total_size = self.0.iter().map(|x| x.len() + 2).sum::<usize>() + 2;
         let memory = alloc_com_ptr(total_size)?;
         let mut next = memory.cast::<u8>();
@@ -25,7 +25,7 @@ impl ItemIdList {
             }
             next.cast::<u16>().write_unaligned(0u16);
         }
-        Ok(memory.cast())
+        Ok((memory.cast(), total_size))
     }
 }
 
