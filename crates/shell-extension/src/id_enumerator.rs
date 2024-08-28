@@ -1,4 +1,4 @@
-use crate::utils::ItemIdList;
+use crate::utils::{debug_log, ItemIdList};
 use crate::DLL_REF_COUNT;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -37,12 +37,15 @@ impl Clone for EnumIdList<'_> {
 
 impl IEnumIDList_Impl for EnumIdList_Impl<'_> {
     fn Next(&self, celt: u32, output: *mut *mut ITEMIDLIST, pceltfetched: *mut u32) -> HRESULT {
+        let current_index = self.index.load(Ordering::Acquire) as usize;
+
+        debug_log(format!(
+            "EnumIdList.next: current:{current_index} fetch:{celt}"
+        ));
+
         let mut fetched = 0;
         for i in 0..celt as usize {
-            if let Some(item) = self
-                .list
-                .get(self.index.load(Ordering::Acquire) as usize + i)
-            {
+            if let Some(item) = self.list.get(current_index + i) {
                 if let Ok(ptr) = item.to_com_ptr() {
                     unsafe { output.wrapping_add(i).write(ptr) };
                     fetched += 1;
@@ -57,6 +60,9 @@ impl IEnumIDList_Impl for EnumIdList_Impl<'_> {
                 pceltfetched.write(fetched);
             }
         }
+
+        debug_log(format!("EnumIdList.Next/ret: fetched: {fetched}"));
+
         match celt == fetched {
             true => S_OK,
             false => S_FALSE,
@@ -64,16 +70,19 @@ impl IEnumIDList_Impl for EnumIdList_Impl<'_> {
     }
 
     fn Skip(&self, celt: u32) -> HRESULT {
+        debug_log(format!("EnumIdList.Skip: skipped:{celt}"));
         self.index.fetch_add(celt, Ordering::Release);
         S_OK
     }
 
     fn Reset(&self) -> HRESULT {
+        debug_log("EnumIdList.Reset");
         self.index.swap(0, Ordering::Release);
         S_OK
     }
 
     fn Clone(&self, ppenum: *mut Option<IEnumIDList>) -> HRESULT {
+        debug_log("EnumIdList.Clone");
         let cloned = self.deref().clone();
         unsafe {
             ppenum.write(Some(cloned.into()));

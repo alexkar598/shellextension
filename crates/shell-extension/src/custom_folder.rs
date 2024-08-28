@@ -24,7 +24,7 @@ use windows::Win32::UI::Shell::PropertiesSystem::PROPERTYKEY;
 use windows::Win32::UI::Shell::{
     IEnumExtraSearch, IEnumIDList, IPersistFolder, IPersistFolder2, IPersistFolder2_Impl,
     IPersistFolder_Impl, IShellFolder, IShellFolder2, IShellFolder2_Impl, IShellFolder_Impl,
-    SHCreateShellFolderView, SFV_CREATE, SHCONTF_FOLDERS, SHGDNF,
+    SHCreateShellFolderView, SFV_CREATE, SHCONTF_FOLDERS, SHCONTF_NONFOLDERS, SHGDNF,
 };
 use windows_core::{implement, IUnknownImpl, Interface, GUID, HRESULT, PCWSTR, PWSTR, VARIANT};
 
@@ -59,12 +59,15 @@ impl IPersist_Impl for CustomFolder_Impl {
 }
 impl IPersistFolder_Impl for CustomFolder_Impl {
     fn Initialize(&self, pidl: *const ITEMIDLIST) -> windows_core::Result<()> {
-        *self.location.write().unwrap() = Some(ItemIdList::from(pidl));
+        let pidl = ItemIdList::from(pidl);
+        debug_log(format!("CustomFolder.Initialize: pidl:{pidl:?}"));
+        *self.location.write().unwrap() = Some(pidl);
         Ok(())
     }
 }
 impl IPersistFolder2_Impl for CustomFolder_Impl {
     fn GetCurFolder(&self) -> windows_core::Result<*mut ITEMIDLIST> {
+        debug_log(format!("CustomFolder.GetCurFolder"));
         self.location
             .read()
             .unwrap()
@@ -102,11 +105,15 @@ impl IShellFolder_Impl for CustomFolder_Impl {
         grfflags: u32,
         ppenumidlist: *mut Option<IEnumIDList>,
     ) -> HRESULT {
+        debug_log(format!(
+            "EnumObjects: flags:{grfflags} folders:{} nonfolders:{}",
+            grfflags.bitand(SHCONTF_FOLDERS.0 as u32) > 0,
+            grfflags.bitand(SHCONTF_NONFOLDERS.0 as u32) > 0
+        ));
         if grfflags.bitand(SHCONTF_FOLDERS.0 as u32) == 0 {
             unsafe { ppenumidlist.write(None) };
             return S_FALSE;
         }
-        debug_log("Allocing enum");
         let enumerator = EnumIdList::new(&virtual_fs).into();
         unsafe { ppenumidlist.write(Some(enumerator)) };
         S_OK
@@ -140,6 +147,9 @@ impl IShellFolder_Impl for CustomFolder_Impl {
     ) -> HRESULT {
         let pidl1 = ItemIdList::from(pidl1);
         let pidl2 = ItemIdList::from(pidl2);
+        debug_log(format!(
+            "CustomFolder.CompareIDs: pidl1:{pidl1:?} pidl2:{pidl2:?}"
+        ));
         match pidl1.cmp(&pidl2) {
             cmp::Ordering::Less => HRESULT(0xFFFF),
             cmp::Ordering::Equal => HRESULT(0),
@@ -154,19 +164,20 @@ impl IShellFolder_Impl for CustomFolder_Impl {
         ppv: *mut *mut c_void,
     ) -> windows_core::Result<()> {
         unsafe {
+            debug_log(format!(
+                "CustomFolder.CreateViewObject: _hwndowner:{_hwndowner:?} riid:{:?} ppv:{ppv:?}",
+                *riid
+            ));
             let options = SFV_CREATE {
                 cbSize: size_of::<SFV_CREATE>() as u32,
-                pshf: ManuallyDrop::new(Some(self.to_interface())),
+                pshf: ManuallyDrop::new(Some(self.to_interface::<IShellFolder>())),
                 psvOuter: ManuallyDrop::new(None),
                 psfvcb: ManuallyDrop::new(None),
             };
             let view = SHCreateShellFolderView(&options)?;
-            view.query(riid, ppv).ok()
-            // if let Ok(interface) = view.query(riid, ppv).ok() {
-            //     Ok(interface)
-            // } else {
-            //     not_implemented("CreateViewObject/interface", E_NOINTERFACE)
-            // }
+            let view = view.query(riid, ppv).ok();
+            debug_log(format!("CreateViewObject/ret: {view:?}, {:?}", *riid));
+            view
         }
     }
 
@@ -197,7 +208,10 @@ impl IShellFolder_Impl for CustomFolder_Impl {
         _uflags: SHGDNF,
         pname: *mut STRRET,
     ) -> windows_core::Result<()> {
-        // let pidl = ItemIdList::from(pidl);
+        debug_log(format!(
+            "CustomFolder.GetDisplayNameOf: pidl:{:?} flags:{_uflags:?} pagename:{pname:?}",
+            ItemIdList::from(_pidl)
+        ));
         let pname = unsafe { pname.as_mut() }.ok_or(E_POINTER)?;
         pname.uType = STRRET_OFFSET.0 as u32;
         pname.Anonymous.uOffset = 2;
@@ -242,6 +256,7 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
     }
 
     fn GetDefaultColumnState(&self, icolumn: u32) -> windows_core::Result<SHCOLSTATE> {
+        debug_log(format!("CustomFolder.GetDefaultColumnState: col:{icolumn}"));
         if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
             Ok(column.2)
         } else {
@@ -263,13 +278,21 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
         icolumn: u32,
         psd: *mut SHELLDETAILS,
     ) -> windows_core::Result<()> {
+        debug_log(format!(
+            "CustomFolder.GetDetailsOf: pid:{:?} col:{icolumn}",
+            if pidl.is_null() {
+                None
+            } else {
+                Some(ItemIdList::from(pidl))
+            }
+        ));
         let psd = unsafe { psd.as_mut() }.ok_or(E_POINTER)?;
         psd.fmt = LVCFMT_LEFT.0;
         if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
             let column = &column.0;
             let column: Vec<_> = column.encode_wide().collect();
             psd.cxChar = column.len() as i32;
-            let string = alloc_com_ptr(column.len() + 2)?.cast::<u16>();
+            let string = alloc_com_ptr((column.len() + 1) * size_of::<u16>())?.cast::<u16>();
             unsafe {
                 string.copy_from_nonoverlapping(column.as_ptr(), column.len());
                 string.wrapping_add(column.len()).write(0);
@@ -285,14 +308,21 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
     }
 
     fn MapColumnToSCID(&self, icolumn: u32, pscid: *mut PROPERTYKEY) -> windows_core::Result<()> {
+        debug_log(format!(
+            "CustomFolder.MapColumnToSCID: col:{icolumn} pscid:{pscid:?}"
+        ));
         let pscid = unsafe { pscid.as_mut() }.ok_or(E_POINTER)?;
 
-        if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
+        let result = if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
             pscid.pid = PID_FIRST_USABLE;
-            pscid.fmtid = NAME_PROPERTY_GUID;
+            pscid.fmtid = column.1;
             Ok(())
         } else {
             Err(E_FAIL.into())
-        }
+        };
+        debug_log(format!(
+            "CustomFolder.MapColumnToSCID/ret: col:{icolumn} {result:?}"
+        ));
+        result
     }
 }
