@@ -1,6 +1,7 @@
 use crate::id_enumerator::EnumIdList;
 use crate::utils::{alloc_com_ptr, debug_log, not_implemented, ItemIdList};
 use crate::{DLL_REF_COUNT, NAME_PROPERTY_GUID, TEST_GUID};
+use encoding_rs::mem::encode_latin1_lossy;
 use lazy_static::lazy_static;
 use std::cmp;
 use std::ffi::{c_void, OsString};
@@ -78,16 +79,12 @@ impl IPersistFolder2_Impl for CustomFolder_Impl {
 }
 lazy_static! {
     static ref virtual_fs: Vec<ItemIdList> = vec![
-        vec!["Hi!".as_bytes()].into(),
-        vec!["Meow, ".as_bytes()].into(),
-        vec!["comment".as_bytes()].into(),
-        vec![OsString::from("ça\0")
-            .encode_wide()
-            .collect::<Vec<_>>()
-            .as_slice()]
-        .into(),
-        vec!["va".as_bytes()].into(),
-        vec!["?".as_bytes()].into(),
+        vec![encode_latin1_lossy("Hi!").as_ref()].into(),
+        vec![encode_latin1_lossy("Meow, ").as_ref()].into(),
+        vec![encode_latin1_lossy("comment").as_ref()].into(),
+        vec![encode_latin1_lossy("ça").as_ref()].into(),
+        vec![encode_latin1_lossy("va").as_ref()].into(),
+        vec![encode_latin1_lossy("?").as_ref()].into(),
     ];
 }
 impl IShellFolder_Impl for CustomFolder_Impl {
