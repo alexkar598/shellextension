@@ -68,12 +68,12 @@ impl IPersistFolder_Impl for CustomFolder_Impl {
 impl IPersistFolder2_Impl for CustomFolder_Impl {
     fn GetCurFolder(&self) -> windows_core::Result<*mut ITEMIDLIST> {
         debug_log(format!("CustomFolder.GetCurFolder"));
-        self.location
-            .read()
-            .unwrap()
-            .as_ref()
-            .ok_or(S_FALSE)?
-            .to_com_ptr()
+        let location = self.location.read().unwrap();
+        let location = location.as_ref().ok_or(S_FALSE)?;
+        debug_log(format!(
+            "CustomFolder.GetCurFolder/ret: location:{location:?}"
+        ));
+        location.to_com_ptr()
     }
 }
 lazy_static! {
