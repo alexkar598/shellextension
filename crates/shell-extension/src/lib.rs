@@ -9,9 +9,10 @@ mod id_enumerator;
 mod utils;
 
 pub use constants::*;
+use std::panic;
 
 use crate::class_factory::ClassFactory;
-use crate::utils::{OutRefExtension, HRESULT};
+use crate::utils::{debug_log, OutRefExtension, HRESULT};
 use lazy_static::lazy_static;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -56,9 +57,20 @@ HRESULT DllCanUnloadNow(
  */
 #[no_mangle]
 extern "system" fn DllCanUnloadNow() -> HRESULT {
-    match DLL_REF_COUNT.load(Ordering::SeqCst) {
+    let result: HRESULT = match DLL_REF_COUNT.load(Ordering::SeqCst) {
         0 => S_OK,
         _ => S_FALSE,
     }
-    .into()
+    .into();
+    result
+}
+
+#[no_mangle]
+pub extern "system" fn DllMain(_: usize, _: u32, _: usize) -> bool {
+    let prev = panic::take_hook();
+    panic::set_hook(Box::new(move |info| {
+        debug_log(format!("Panicked: {info}"));
+        prev(info);
+    }));
+    true
 }
