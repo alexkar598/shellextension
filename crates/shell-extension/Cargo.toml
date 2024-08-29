@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 [dependencies]
 lazy_static = "1.5.0"
 windows-core = "0.58.0"
-encoding_rs = "0.8.34"
+bytemuck = "1.17.1"
 
 [dependencies.windows]
 version = "0.58.0"

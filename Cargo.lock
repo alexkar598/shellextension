@@ -3,19 +3,10 @@
 version = 3
 
 [[package]]
-name = "cfg-if"
-version = "1.0.0"
+name = "bytemuck"
+version = "1.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
-
-[[package]]
-name = "encoding_rs"
-version = "0.8.34"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b45de904aa0b010bce2ab45264d0631681847fa7b6f2eaa7dab7619943bc4f59"
-dependencies = [
- "cfg-if",
-]
+checksum = "773d90827bc3feecfb67fab12e24de0749aad83c74b9504ecde46237b5cd24e2"
 
 [[package]]
 name = "get-uuid"
@@ -59,7 +50,7 @@ dependencies = [
 name = "shell-extension"
 version = "0.1.0"
 dependencies = [
- "encoding_rs",
+ "bytemuck",
  "lazy_static",
  "windows",
  "windows-core",

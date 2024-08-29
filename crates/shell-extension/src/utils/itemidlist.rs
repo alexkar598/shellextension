@@ -1,7 +1,10 @@
 use crate::utils::item_id::ItemId;
 use crate::utils::{alloc_com_ptr, ToComPtr};
+use bytemuck::checked::cast_slice;
+use std::ffi::OsString;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
+use std::os::windows::ffi::OsStrExt;
 use std::ptr;
 use windows::Win32::UI::Shell::Common::ITEMIDLIST;
 
@@ -68,23 +71,18 @@ impl From<*const ITEMIDLIST> for ItemIdList {
         result
     }
 }
-impl From<Vec<&[u8]>> for ItemIdList {
-    fn from(mut value: Vec<&[u8]>) -> Self {
-        Self(value.iter_mut().map(|&mut x| Box::from(x)).collect())
-    }
-}
-impl From<Vec<&[u16]>> for ItemIdList {
-    fn from(mut value: Vec<&[u16]>) -> Self {
-        Self(
-            value
-                .iter_mut()
-                .map(|&mut x| {
-                    let len = 2 * x.len();
-                    let ptr = x.as_ptr().cast::<u8>();
-                    Box::from(unsafe { std::slice::from_raw_parts(ptr, len) })
-                })
-                .collect(),
-        )
+
+impl From<Vec<&str>> for ItemIdList {
+    ///Value must be valid utf8
+    fn from(value: Vec<&str>) -> Self {
+        let value = value.into_iter();
+        let value = value.map(|x| {
+            let x: Vec<_> = OsString::from(x).encode_wide().collect();
+            let x: &[u8] = cast_slice(x.deref());
+            x.into()
+        });
+        let value = value.collect();
+        Self(value)
     }
 }
 

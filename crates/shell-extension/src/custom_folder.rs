@@ -1,25 +1,20 @@
 use crate::id_enumerator::EnumIdList;
-use crate::utils::{alloc_com_ptr, debug_log, not_implemented, ItemIdList, ToComPtr};
-use crate::{DLL_REF_COUNT, NAME_PROPERTY_GUID, TEST_GUID};
-use encoding_rs::mem::encode_latin1_lossy;
+use crate::utils::{debug_log, get_property_key_from_name, not_implemented, ItemIdList, ToComPtr};
+use crate::{DLL_REF_COUNT, TEST_GUID, TEST_PROPERTY_GUID};
 use lazy_static::lazy_static;
 use std::cmp;
 use std::ffi::{c_void, OsString};
-use std::io::Write;
 use std::mem::ManuallyDrop;
 use std::ops::BitAnd;
-use std::os::windows::ffi::OsStrExt;
 use std::sync::atomic::Ordering;
 use std::sync::RwLock;
-use windows::Win32::Foundation::{
-    E_FAIL, E_NOINTERFACE, E_NOTIMPL, E_POINTER, HWND, LPARAM, S_FALSE, S_OK,
-};
+use windows::Win32::Foundation::{E_FAIL, E_NOTIMPL, E_POINTER, HWND, LPARAM, S_FALSE, S_OK};
 use windows::Win32::System::Com::StructuredStorage::PID_FIRST_USABLE;
 use windows::Win32::System::Com::{IBindCtx, IPersist_Impl};
 use windows::Win32::UI::Controls::LVCFMT_LEFT;
 use windows::Win32::UI::Shell::Common::{
     ITEMIDLIST, SHCOLSTATE, SHCOLSTATE_ONBYDEFAULT, SHCOLSTATE_TYPE_STR, SHELLDETAILS, STRRET,
-    STRRET_OFFSET, STRRET_WSTR,
+    STRRET_WSTR,
 };
 use windows::Win32::UI::Shell::PropertiesSystem::PROPERTYKEY;
 use windows::Win32::UI::Shell::{
@@ -79,12 +74,12 @@ impl IPersistFolder2_Impl for CustomFolder_Impl {
 }
 lazy_static! {
     static ref virtual_fs: Vec<ItemIdList> = vec![
-        vec![encode_latin1_lossy("Hi!").as_ref()].into(),
-        vec![encode_latin1_lossy("Meow, ").as_ref()].into(),
-        vec![encode_latin1_lossy("comment").as_ref()].into(),
-        vec![encode_latin1_lossy("ça").as_ref()].into(),
-        vec![encode_latin1_lossy("va").as_ref()].into(),
-        vec![encode_latin1_lossy("?").as_ref()].into(),
+        vec!["Hi!"].into(),
+        vec!["Meow, "].into(),
+        vec!["comment"].into(),
+        vec!["ça"].into(),
+        vec!["va"].into(),
+        vec!["?"].into(),
     ];
 }
 impl IShellFolder_Impl for CustomFolder_Impl {
@@ -210,12 +205,16 @@ impl IShellFolder_Impl for CustomFolder_Impl {
         pname: *mut STRRET,
     ) -> windows_core::Result<()> {
         let pidl = ItemIdList::from(pidl);
+        if pidl.len() != 1 {
+            return Err(E_FAIL.into());
+        }
+        let pidl = pidl[0].as_ref();
         debug_log(format!(
             "CustomFolder.GetDisplayNameOf: pidl:{pidl:?} flags:{_uflags:?} pagename:{pname:?}",
         ));
         let pname = unsafe { pname.as_mut() }.ok_or(E_POINTER)?;
         pname.uType = STRRET_WSTR.0 as u32;
-        pname.Anonymous.uOffset = 2;
+        pname.Anonymous.pOleStr = PWSTR::from_raw(pidl.to_com_ptr()?.0);
         Ok(())
     }
 
@@ -232,11 +231,21 @@ impl IShellFolder_Impl for CustomFolder_Impl {
 }
 
 lazy_static! {
-    static ref virtual_fs_columns: Vec<(OsString, GUID, SHCOLSTATE)> = vec![(
-        OsString::from("Name"),
-        NAME_PROPERTY_GUID,
-        SHCOLSTATE(SHCOLSTATE_TYPE_STR.0 | SHCOLSTATE_ONBYDEFAULT.0)
-    )];
+    static ref virtual_fs_columns: Vec<(OsString, PROPERTYKEY, SHCOLSTATE)> = vec![
+        (
+            OsString::from("Name"),
+            get_property_key_from_name("System.ItemNameDisplay").unwrap(),
+            SHCOLSTATE(SHCOLSTATE_TYPE_STR.0 | SHCOLSTATE_ONBYDEFAULT.0)
+        ),
+        (
+            OsString::from("Test"),
+            PROPERTYKEY {
+                fmtid: TEST_PROPERTY_GUID,
+                pid: PID_FIRST_USABLE
+            },
+            SHCOLSTATE(SHCOLSTATE_TYPE_STR.0 | SHCOLSTATE_ONBYDEFAULT.0)
+        ),
+    ];
 }
 impl IShellFolder2_Impl for CustomFolder_Impl {
     fn GetDefaultSearchGUID(&self) -> windows_core::Result<GUID> {
@@ -293,9 +302,8 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
             let column = &column.0;
             let (column, size): (*mut u16, _) = column.to_com_ptr()?;
             psd.cxChar = size as i32;
-            psd.str.uType = STRRET_OFFSET.0 as u32;
-            psd.str.Anonymous.uOffset = 2;
-            // psd.str.Anonymous.pOleStr = PWSTR::from_raw(column);
+            psd.str.uType = STRRET_WSTR.0 as u32;
+            psd.str.Anonymous.pOleStr = PWSTR::from_raw(column);
 
             Ok(())
         } else {
@@ -310,8 +318,7 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
         let pscid = unsafe { pscid.as_mut() }.ok_or(E_POINTER)?;
 
         let result = if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
-            pscid.pid = PID_FIRST_USABLE;
-            pscid.fmtid = column.1;
+            pscid.clone_from(&column.1);
             Ok(())
         } else {
             Err(E_FAIL.into())

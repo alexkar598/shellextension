@@ -42,7 +42,6 @@ impl IEnumIDList_Impl for EnumIdList_Impl<'_> {
         debug_log(format!(
             "EnumIdList.next: current:{current_index} fetch:{celt}"
         ));
-
         let mut fetched = 0;
         for i in 0..celt as usize {
             if let Some(item) = self.list.get(current_index + i) {

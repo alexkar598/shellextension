@@ -1,22 +1,23 @@
 #![feature(try_trait_v2)]
 #![feature(ptr_metadata)]
+extern crate core;
 
 mod class_factory;
 mod constants;
 mod custom_folder;
-mod utils;
 mod id_enumerator;
+mod utils;
 
 pub use constants::*;
 
 use crate::class_factory::ClassFactory;
+use crate::utils::{OutRefExtension, HRESULT};
 use lazy_static::lazy_static;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use windows::core::GUID;
 use windows::Win32::Foundation::{CLASS_E_CLASSNOTAVAILABLE, E_POINTER, S_FALSE, S_OK};
 use windows_core::{IUnknown, Interface, OutRef};
-use crate::utils::{OutRefExtension, HRESULT};
 
 lazy_static! {
     /// The number of references to this module (DLL)
@@ -36,26 +37,28 @@ extern "system" fn DllGetClassObject(
     riid: *const GUID,
     factory: OutRef<IUnknown>,
 ) -> HRESULT {
-    let rclsid = unsafe {rclsid.as_ref()}.ok_or(E_POINTER)?;
+    let rclsid = unsafe { rclsid.as_ref() }.ok_or(E_POINTER)?;
     match *rclsid {
-        TEST_GUID => 
-            unsafe {IUnknown::from(ClassFactory::new()).query(riid, factory.into_ptr())}.into(),
-        _ => {
-            factory.write(None).err().map_or(CLASS_E_CLASSNOTAVAILABLE, |x| x.into()).into()
+        TEST_GUID => {
+            unsafe { IUnknown::from(ClassFactory::new()).query(riid, factory.into_ptr()) }.into()
         }
+        _ => factory
+            .write(None)
+            .err()
+            .map_or(CLASS_E_CLASSNOTAVAILABLE, |x| x.into())
+            .into(),
     }
 }
-
 
 /*
 HRESULT DllCanUnloadNow(
 );
  */
 #[no_mangle]
-extern "system" fn DllCanUnloadNow(
-) -> HRESULT {
+extern "system" fn DllCanUnloadNow() -> HRESULT {
     match DLL_REF_COUNT.load(Ordering::SeqCst) {
         0 => S_OK,
-        _ => S_FALSE
-    }.into()
+        _ => S_FALSE,
+    }
+    .into()
 }

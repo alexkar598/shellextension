@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
+  <configuration default="false" name="Run (get-uuid)" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
     <option name="command" value="run --package get-uuid" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs />
