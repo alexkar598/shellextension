@@ -1,7 +1,7 @@
 use crate::id_enumerator::EnumIdList;
 use crate::utils::{
     debug_log, get_property_key_from_name, not_implemented, BoundedDeref, BoundedDerefMut,
-    ItemIdList, ToComPtr,
+    BoundedOptionalDeref, ItemIdList, ToComPtr,
 };
 use crate::{DLL_REF_COUNT, TEST_GUID, TEST_PROPERTY_GUID};
 use lazy_static::lazy_static;
@@ -303,10 +303,10 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
         icolumn: u32,
         psd: *mut SHELLDETAILS,
     ) -> windows_core::Result<()> {
-        pidl.with_ref(|pidl| {
+        pidl.with_optional_ref(|pidl| {
             debug_log(format!(
                 "CustomFolder.GetDetailsOf: pid:{:?} col:{icolumn}",
-                ItemIdList::from(pidl)
+                pidl.map(ItemIdList::from)
             ));
 
             if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
