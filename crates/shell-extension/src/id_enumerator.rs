@@ -8,12 +8,12 @@ use windows::Win32::UI::Shell::{IEnumIDList, IEnumIDList_Impl};
 use windows_core::{implement, HRESULT};
 
 #[implement(IEnumIDList)]
-pub struct EnumIdList<'a> {
+pub struct EnumIdList<'a, 'b> {
     index: AtomicU32,
-    list: &'a [ItemIdList],
+    list: &'a [ItemIdList<'b>],
 }
-impl<'a> EnumIdList<'a> {
-    pub fn new(list: &'a [ItemIdList]) -> Self {
+impl<'a, 'b> EnumIdList<'a, 'b> {
+    pub fn new(list: &'a [ItemIdList<'b>]) -> Self {
         DLL_REF_COUNT.fetch_add(1, Ordering::SeqCst);
         Self {
             index: AtomicU32::new(0),
@@ -21,12 +21,12 @@ impl<'a> EnumIdList<'a> {
         }
     }
 }
-impl Drop for EnumIdList<'_> {
+impl Drop for EnumIdList<'_, '_> {
     fn drop(&mut self) {
         DLL_REF_COUNT.fetch_sub(1, Ordering::SeqCst);
     }
 }
-impl Clone for EnumIdList<'_> {
+impl Clone for EnumIdList<'_, '_> {
     fn clone(&self) -> Self {
         EnumIdList {
             index: self.index.load(Ordering::Acquire).into(),
@@ -35,7 +35,7 @@ impl Clone for EnumIdList<'_> {
     }
 }
 
-impl IEnumIDList_Impl for EnumIdList_Impl<'_> {
+impl IEnumIDList_Impl for EnumIdList_Impl<'_, '_> {
     fn Next(&self, celt: u32, output: *mut *mut ITEMIDLIST, pceltfetched: *mut u32) -> HRESULT {
         let current_index = self.index.load(Ordering::Acquire) as usize;
 

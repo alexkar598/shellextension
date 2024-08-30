@@ -8,12 +8,12 @@ mod custom_folder;
 mod id_enumerator;
 mod utils;
 
-pub use constants::*;
-use std::panic;
-
 use crate::class_factory::ClassFactory;
 use crate::utils::{debug_log, OutRefExtension, HRESULT};
+pub use constants::*;
 use lazy_static::lazy_static;
+use std::backtrace::Backtrace;
+use std::panic;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use windows::core::GUID;
@@ -69,7 +69,8 @@ extern "system" fn DllCanUnloadNow() -> HRESULT {
 pub extern "system" fn DllMain(_: usize, _: u32, _: usize) -> bool {
     let prev = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
-        debug_log(format!("Panicked: {info}"));
+        let backtrace = Backtrace::force_capture();
+        debug_log(format!("Panicked: {info}:\n{backtrace}"));
         prev(info);
     }));
     true

@@ -1,5 +1,7 @@
 use crate::id_enumerator::EnumIdList;
-use crate::utils::{debug_log, get_property_key_from_name, not_implemented, ItemIdList, ToComPtr};
+use crate::utils::{
+    debug_log, get_property_key_from_name, not_implemented, BoundedDeref, ItemIdList, ToComPtr,
+};
 use crate::{DLL_REF_COUNT, TEST_GUID, TEST_PROPERTY_GUID};
 use lazy_static::lazy_static;
 use std::cmp;
@@ -26,7 +28,7 @@ use windows_core::{implement, IUnknownImpl, Interface, GUID, HRESULT, PCWSTR, PW
 
 #[implement(IPersistFolder, IPersistFolder2, IShellFolder, IShellFolder2)]
 pub struct CustomFolder {
-    location: RwLock<Option<ItemIdList>>,
+    location: RwLock<Option<ItemIdList<'static>>>,
 }
 
 impl CustomFolder {
@@ -55,15 +57,17 @@ impl IPersist_Impl for CustomFolder_Impl {
 }
 impl IPersistFolder_Impl for CustomFolder_Impl {
     fn Initialize(&self, pidl: *const ITEMIDLIST) -> windows_core::Result<()> {
-        let pidl = ItemIdList::from(pidl);
-        debug_log(format!("CustomFolder.Initialize: pidl:{pidl:?}"));
-        *self.location.write().unwrap() = Some(pidl);
-        Ok(())
+        pidl.with_ref(|pidl| {
+            let pidl = ItemIdList::from(pidl).into_owned();
+            debug_log(format!("CustomFolder.Initialize: pidl:{pidl:?}"));
+            *self.location.write().unwrap() = Some(pidl);
+            Ok(())
+        })
     }
 }
 impl IPersistFolder2_Impl for CustomFolder_Impl {
     fn GetCurFolder(&self) -> windows_core::Result<*mut ITEMIDLIST> {
-        debug_log(format!("CustomFolder.GetCurFolder"));
+        debug_log("CustomFolder.GetCurFolder");
         let location = self.location.read().unwrap();
         let location = location.as_ref().ok_or(S_FALSE)?;
         debug_log(format!(
@@ -73,7 +77,7 @@ impl IPersistFolder2_Impl for CustomFolder_Impl {
     }
 }
 lazy_static! {
-    static ref virtual_fs: Vec<ItemIdList> = vec![
+    static ref virtual_fs: Vec<ItemIdList<'static>> = vec![
         vec!["Hi!"].into(),
         vec!["Meow, "].into(),
         vec!["comment"].into(),
@@ -141,16 +145,23 @@ impl IShellFolder_Impl for CustomFolder_Impl {
         pidl1: *const ITEMIDLIST,
         pidl2: *const ITEMIDLIST,
     ) -> HRESULT {
-        let pidl1 = ItemIdList::from(pidl1);
-        let pidl2 = ItemIdList::from(pidl2);
-        debug_log(format!(
-            "CustomFolder.CompareIDs: pidl1:{pidl1:?} pidl2:{pidl2:?}"
-        ));
-        match pidl1.cmp(&pidl2) {
-            cmp::Ordering::Less => HRESULT(0xFFFF),
-            cmp::Ordering::Equal => HRESULT(0),
-            cmp::Ordering::Greater => HRESULT(1),
-        }
+        pidl1
+            .with_ref(|pidl1| {
+                pidl2.with_ref(|pidl2| {
+                    let pidl1 = ItemIdList::from(pidl1);
+                    let pidl2 = ItemIdList::from(pidl2);
+                    debug_log(format!(
+                        "CustomFolder.CompareIDs: pidl1:{pidl1:?} pidl2:{pidl2:?}"
+                    ));
+                    let result = match pidl1.cmp(&pidl2) {
+                        cmp::Ordering::Less => HRESULT(0xFFFF),
+                        cmp::Ordering::Equal => HRESULT(0),
+                        cmp::Ordering::Greater => HRESULT(1),
+                    };
+                    Ok(result)
+                })
+            })
+            .into()
     }
 
     fn CreateViewObject(
@@ -204,6 +215,7 @@ impl IShellFolder_Impl for CustomFolder_Impl {
         _uflags: SHGDNF,
         pname: *mut STRRET,
     ) -> windows_core::Result<()> {
+        let pidl = unsafe { pidl.as_ref() }.ok_or(E_POINTER)?;
         let pidl = ItemIdList::from(pidl);
         if pidl.len() != 1 {
             return Err(E_FAIL.into());
@@ -288,13 +300,10 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
         icolumn: u32,
         psd: *mut SHELLDETAILS,
     ) -> windows_core::Result<()> {
+        let pidl = unsafe { pidl.as_ref() };
         debug_log(format!(
             "CustomFolder.GetDetailsOf: pid:{:?} col:{icolumn}",
-            if pidl.is_null() {
-                None
-            } else {
-                Some(ItemIdList::from(pidl))
-            }
+            pidl.map(ItemIdList::from)
         ));
         let psd = unsafe { psd.as_mut() }.ok_or(E_POINTER)?;
         psd.fmt = LVCFMT_LEFT.0;
