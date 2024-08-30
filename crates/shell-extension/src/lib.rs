@@ -5,6 +5,7 @@ extern crate core;
 mod class_factory;
 mod constants;
 mod custom_folder;
+mod file;
 mod id_enumerator;
 mod utils;
 
