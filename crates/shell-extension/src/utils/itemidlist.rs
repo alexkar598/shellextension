@@ -5,13 +5,11 @@ use std::borrow::Cow;
 use std::borrow::Cow::Owned;
 use std::ffi::OsString;
 use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
 use std::mem::transmute;
 use std::ops::Deref;
 use std::os::windows::ffi::OsStrExt;
 use std::ptr;
 use windows::Win32::UI::Shell::Common::ITEMIDLIST;
-use windows_core::imp::E_POINTER;
 
 #[repr(transparent)]
 #[derive(PartialEq, PartialOrd)]
@@ -108,16 +106,5 @@ impl<'a> Deref for ItemIdList<'a> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-pub trait BoundedDeref<T, R> {
-    fn with_ref(self, f: impl FnOnce(&T) -> windows_core::Result<R>) -> windows_core::Result<R>;
-}
-
-impl<T, R> BoundedDeref<T, R> for *const T {
-    fn with_ref(self, f: impl FnOnce(&T) -> windows_core::Result<R>) -> windows_core::Result<R> {
-        let ptr = unsafe { self.as_ref() }.ok_or(E_POINTER)?;
-        f(ptr)
     }
 }

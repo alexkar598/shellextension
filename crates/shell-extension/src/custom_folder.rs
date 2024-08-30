@@ -1,6 +1,7 @@
 use crate::id_enumerator::EnumIdList;
 use crate::utils::{
-    debug_log, get_property_key_from_name, not_implemented, BoundedDeref, ItemIdList, ToComPtr,
+    debug_log, get_property_key_from_name, not_implemented, BoundedDeref, BoundedDerefMut,
+    ItemIdList, ToComPtr,
 };
 use crate::{DLL_REF_COUNT, TEST_GUID, TEST_PROPERTY_GUID};
 use lazy_static::lazy_static;
@@ -215,19 +216,21 @@ impl IShellFolder_Impl for CustomFolder_Impl {
         _uflags: SHGDNF,
         pname: *mut STRRET,
     ) -> windows_core::Result<()> {
-        let pidl = unsafe { pidl.as_ref() }.ok_or(E_POINTER)?;
-        let pidl = ItemIdList::from(pidl);
-        if pidl.len() != 1 {
-            return Err(E_FAIL.into());
-        }
-        let pidl = pidl[0].as_ref();
-        debug_log(format!(
-            "CustomFolder.GetDisplayNameOf: pidl:{pidl:?} flags:{_uflags:?} pagename:{pname:?}",
-        ));
-        let pname = unsafe { pname.as_mut() }.ok_or(E_POINTER)?;
-        pname.uType = STRRET_WSTR.0 as u32;
-        pname.Anonymous.pOleStr = PWSTR::from_raw(pidl.to_com_ptr()?.0);
-        Ok(())
+        pidl.with_ref(|pidl| {
+            let pidl = ItemIdList::from(pidl);
+            if pidl.len() != 1 {
+                return Err(E_FAIL.into());
+            }
+            let pidl = pidl[0].as_ref();
+            debug_log(format!(
+                "CustomFolder.GetDisplayNameOf: pidl:{pidl:?} flags:{_uflags:?} pagename:{pname:?}",
+            ));
+            pname.with_mut_ref(|pname| {
+                pname.uType = STRRET_WSTR.0 as u32;
+                pname.Anonymous.pOleStr = PWSTR::from_raw(pidl.to_com_ptr()?.0);
+                Ok(())
+            })
+        })
     }
 
     fn SetNameOf(
@@ -300,34 +303,38 @@ impl IShellFolder2_Impl for CustomFolder_Impl {
         icolumn: u32,
         psd: *mut SHELLDETAILS,
     ) -> windows_core::Result<()> {
-        let pidl = unsafe { pidl.as_ref() };
-        debug_log(format!(
-            "CustomFolder.GetDetailsOf: pid:{:?} col:{icolumn}",
-            pidl.map(ItemIdList::from)
-        ));
-        let psd = unsafe { psd.as_mut() }.ok_or(E_POINTER)?;
-        psd.fmt = LVCFMT_LEFT.0;
-        if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
-            let column = &column.0;
-            let (column, size): (*mut u16, _) = column.to_com_ptr()?;
-            psd.cxChar = size as i32;
-            psd.str.uType = STRRET_WSTR.0 as u32;
-            psd.str.Anonymous.pOleStr = PWSTR::from_raw(column);
+        pidl.with_ref(|pidl| {
+            debug_log(format!(
+                "CustomFolder.GetDetailsOf: pid:{:?} col:{icolumn}",
+                ItemIdList::from(pidl)
+            ));
 
-            Ok(())
-        } else {
-            Err(E_FAIL.into())
-        }
+            if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
+                let column = &column.0;
+                let (column, size): (*mut u16, _) = column.to_com_ptr()?;
+                psd.with_mut_ref(|psd| {
+                    psd.fmt = LVCFMT_LEFT.0;
+                    psd.cxChar = size as i32;
+                    psd.str.uType = STRRET_WSTR.0 as u32;
+                    psd.str.Anonymous.pOleStr = PWSTR::from_raw(column);
+                    Ok(())
+                })
+            } else {
+                Err(E_FAIL.into())
+            }
+        })
     }
 
     fn MapColumnToSCID(&self, icolumn: u32, pscid: *mut PROPERTYKEY) -> windows_core::Result<()> {
         debug_log(format!(
             "CustomFolder.MapColumnToSCID: col:{icolumn} pscid:{pscid:?}"
         ));
-        let pscid = unsafe { pscid.as_mut() }.ok_or(E_POINTER)?;
 
         let result = if let Some(column) = virtual_fs_columns.get(icolumn as usize) {
-            pscid.clone_from(&column.1);
+            pscid.with_mut_ref(|x| {
+                x.clone_from(&column.1);
+                Ok(())
+            })?;
             Ok(())
         } else {
             Err(E_FAIL.into())

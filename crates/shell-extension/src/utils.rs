@@ -1,4 +1,5 @@
 mod alloc;
+mod bounded_deref;
 mod hresult;
 mod item_id;
 mod itemidlist;
@@ -6,8 +7,8 @@ mod outrefcast;
 mod property;
 
 pub use alloc::*;
+pub use bounded_deref::*;
 pub use hresult::*;
-pub use item_id::*;
 pub use itemidlist::*;
 pub use outrefcast::*;
 pub use property::*;
