@@ -15,7 +15,7 @@ use windows_core::imp::E_POINTER;
 
 #[repr(transparent)]
 #[derive(PartialEq, PartialOrd)]
-pub struct ItemIdList<'a>(pub Vec<Cow<'a, [u8]>>, PhantomData<&'a ()>);
+pub struct ItemIdList<'a>(pub Vec<Cow<'a, [u8]>>);
 impl<'a> ItemIdList<'a> {
     pub fn into_owned(self) -> ItemIdList<'static> {
         let owned = self
@@ -23,7 +23,7 @@ impl<'a> ItemIdList<'a> {
             .iter()
             .map(|x| Owned(x.clone().into_owned()))
             .collect();
-        unsafe { transmute::<ItemIdList<'a>, ItemIdList<'static>>(Self(owned, Default::default())) }
+        unsafe { transmute::<ItemIdList<'a>, ItemIdList<'static>>(Self(owned)) }
     }
 }
 
@@ -84,7 +84,7 @@ impl<'a> From<&'a ITEMIDLIST> for ItemIdList<'a> {
                 next = next.wrapping_byte_add(length);
             }
         }
-        Self(result, Default::default())
+        Self(result)
     }
 }
 
@@ -99,7 +99,7 @@ impl From<Vec<&str>> for ItemIdList<'_> {
             x
         });
         let value = value.collect();
-        Self(value, Default::default())
+        Self(value)
     }
 }
 
